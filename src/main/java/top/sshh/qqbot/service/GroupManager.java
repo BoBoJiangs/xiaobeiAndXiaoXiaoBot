@@ -84,7 +84,7 @@ public class GroupManager {
         logger.debug("定时任务数据持久化完成");
     }
 
-    @PreDestroy
+     @PreDestroy
     public void onShutdown() {
         this.saveTasksToFile();
         logger.info("程序关闭时持久化任务数据完成");

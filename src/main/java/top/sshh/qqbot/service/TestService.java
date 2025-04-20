@@ -34,8 +34,6 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.aspectj.bridge.Version.getText;
-import static top.sshh.qqbot.service.DanCalculator.MAKE_DAN_SET;
 
 @Component
 public class TestService {
@@ -437,8 +435,7 @@ public class TestService {
                                     name = name.replaceAll("\\s", "");
                                     if (StringUtils.isNotBlank(name)) {
                                         boolean b = !("渡厄丹,寒铁铸心炉,陨铁炉,雕花紫铜炉").contains(name);
-                                        boolean isMakeDan = !MAKE_DAN_SET.contains(name);
-                                        if (message.endsWith("一键炼金") && b && isMakeDan) {
+                                        if (message.endsWith("一键炼金") && b ) {
                                             if (botConfig.isStop()) {
                                                 botConfig.setStop(false);
                                                 return;
@@ -1073,7 +1070,9 @@ public class TestService {
                     try {
                         Bot bot1 = (Bot)var1.next();
                         Group bot1Group = bot1.getGroup(group.getGroupId());
-                        TestService.this.forSendMessage(bot1, bot1Group, messageChain, count, time);
+                        if(bot1Group.getMember(bot1.getBotId())!=null){
+                            TestService.this.forSendMessage(bot1, bot1Group, messageChain, count, time);
+                        }
                     } catch (Exception var4) {
                     }
                 }
