@@ -49,6 +49,7 @@ public class XiaoBeiService {
     public static final String MODE_NAME = "邪修抢夺灵石#私自架设小型窝点#被追打催债#秘境内竟然#请道友下山购买#为宗门购买一些#速去仙境抢夺仙境之石#义字当头";
     @Value("${xbGroupId}")
     private Long xbGroupId;
+    private Map<Long,  Map<String, Integer>> herbMap = new ConcurrentHashMap<>();
     public XiaoBeiService() {
     }
 
@@ -78,9 +79,34 @@ public class XiaoBeiService {
             group.sendMessage((new MessageChain()).at("3889029313").text("查询世界BOSS "+number));
         }
 
-        if ("小北自动药材上架".equals(message)) {
+        if ("小北自动药材上架".equals(message) ) {
             botConfig.setCommand("小北自动药材上架");
             group.sendMessage((new MessageChain()).at("3889029313").text("药材"));
+        }
+
+        if ("确认药材上架".equals(message) ) {
+            // 遍历外层Map
+            for (Map.Entry<Long, Map<String, Integer>> outerEntry : herbMap.entrySet()) {
+                Long outerKey = outerEntry.getKey();
+                Map<String, Integer> innerMap = outerEntry.getValue();
+
+                // 遍历内层Map
+                for (Map.Entry<String, Integer> innerEntry : innerMap.entrySet()) {
+                    String innerKey = innerEntry.getKey();
+                    Integer value = innerEntry.getValue();
+                    Bot bot1 = BotFactory.getBots().get(outerKey);
+                    Group group1 =  bot1.getGroup(xbGroupId);
+                    if(bot1!=null && group1!=null){
+                        group1.sendMessage((new MessageChain())
+                                .at("3889029313").text("坊市上架 " + innerKey + " " + 1 + " " + value));
+                        Thread.sleep(3000L);
+                    }
+//                    System.out.println("OuterKey: " + outerKey +
+//                            ", InnerKey: " + innerKey +
+//                            ", Value: " + value);
+                }
+            }
+            herbMap.clear();
         }
 
         if (message.endsWith("小北药材上架")) {
@@ -95,19 +121,25 @@ public class XiaoBeiService {
                         String herbsInfo = textMessage.getText();
                         String[] lines = herbsInfo.split("\n");
                         Map<String, Integer> herbs = extractHerbs(herbsInfo);
-                        Iterator var16 = herbs.entrySet().iterator();
 
-                        while(var16.hasNext()) {
-                            Map.Entry<String, Integer> entry = (Map.Entry)var16.next();
-                            if (botConfig.isStop()) {
-                                botConfig.setStop(false);
-                                break;
+                        if(botConfig.getCommand().equals("小北自动药材上架")){
+                            herbMap.put(bot.getBotId(),herbs);
+                        }else{
+                            Iterator var16 = herbs.entrySet().iterator();
+
+                            while(var16.hasNext()) {
+                                Map.Entry<String, Integer> entry = (Map.Entry)var16.next();
+                                if (botConfig.isStop()) {
+                                    botConfig.setStop(false);
+                                    break;
+                                }
+
+                                group.sendMessage((new MessageChain()).at("3889029313").text("坊市上架 " + (String)entry.getKey() + " " + 1 + " " + entry.getValue()));
+                                Thread.sleep(3000L);
+
                             }
-
-                            group.sendMessage((new MessageChain()).at("3889029313").text("坊市上架 " + (String)entry.getKey() + " " + 1 + " " + entry.getValue()));
-                            Thread.sleep(3000L);
-
                         }
+
                     }
                 }
 
@@ -115,6 +147,10 @@ public class XiaoBeiService {
             }
         }
 
+    }
+
+    private boolean isAtSelf(String message,Bot bot){
+        return message.contains("@" + bot.getBotId()) || message.contains("@" +bot.getBotName()) ;
     }
 
     @GroupMessageHandler(
@@ -207,7 +243,7 @@ public class XiaoBeiService {
             senderIds = {3889029313L}
     )
     public void 小北药材上架(Bot bot, Group group, Member member, MessageChain messageChain, String message, Integer messageId) {
-        boolean isAtSelf = message.contains("" + bot.getBotId()) || message.contains(bot.getBotName());
+        boolean isAtSelf = isAtSelf(message,bot);
         if (isAtSelf && message.contains("的药材背包")) {
             System.out.println(message);
             BotConfig botConfig = bot.getBotConfig();
@@ -239,11 +275,17 @@ public class XiaoBeiService {
                     return;
                 case 1:
                     group.sendMessage((new MessageChain()).at("3889029313").text("宗门任务接取"));
-                    botConfig.setBeiFamilyTaskStatus(2);
+//                    botConfig.setBeiFamilyTaskStatus(2);
                     return;
                 case 2:
                     group.sendMessage((new MessageChain()).at("3889029313").text("宗门任务完成"));
                     botConfig.setBeiFamilyTaskStatus(1);
+                    return;
+                case 3:
+                    if (botConfig.getLastBeiExecuteTime() + 10000L < System.currentTimeMillis()) {
+                        group.sendMessage((new MessageChain()).at("3889029313").text("宗门任务刷新"));
+                    }
+
                     return;
                 default:
             }
@@ -257,24 +299,33 @@ public class XiaoBeiService {
         BotConfig botConfig = bot.getBotConfig();
 //        boolean isGroup = group.getGroupId() == botConfig.getGroupId() || group.getGroupId() == botConfig.getTaskId();
         boolean isGroup = isXbGroup(group, botConfig);
-        boolean isAtSelf = message.contains("" + bot.getBotId()) || message.contains(bot.getBotName());
+        boolean isAtSelf = isAtSelf(message,bot);
         if (isGroup && isAtSelf) {
             if (message.contains("今日无法再获取宗门任务")) {
                 proccessCultivation(group, botConfig);
-            }
-
-            if (message.contains("请检查该道具是否在背包内")||message.contains("道友不满足使用条件")) {
+            }else if (message.contains("请检查该道具是否在背包内")||message.contains("道友不满足使用条件")) {
                 botConfig.setBeiFamilyTaskStatus(0);
-            }
-
-            if (message.contains("灵石带少了") && message.contains("出门做任务") && message.contains("不扣你任务次数")) {
+            }else if (message.contains("灵石带少了") && message.contains("出门做任务") && message.contains("不扣你任务次数")) {
                 botConfig.setBeiFamilyTaskStatus(0);
-            }
-
-            if (message.contains("状态欠佳") && message.contains("出门做任务") && message.contains("不扣你任务次数")) {
+            }else if (message.contains("状态欠佳") && message.contains("出门做任务") && message.contains("不扣你任务次数")) {
                 group.sendMessage((new MessageChain()).at("3889029313").text("使用道源丹"));
                 botConfig.setBeiFamilyTaskStatus(1);
             }
+            if (message.contains("九转仙丹")&&message.contains("请道友下山购买")) {
+                botConfig.setLastBeiExecuteTime(System.currentTimeMillis());
+                botConfig.setBeiFamilyTaskStatus(2);
+            }else{
+                if(botConfig.getBeiFamilyTaskStatus() !=0){
+                    if(message.contains("点击宗门任务接取")){
+                        botConfig.setBeiFamilyTaskStatus(1);
+                    }else{
+                        botConfig.setBeiFamilyTaskStatus(3);
+                        botConfig.setLastBeiExecuteTime(System.currentTimeMillis());
+                    }
+
+                }
+            }
+
         }
 
     }
@@ -287,7 +338,7 @@ public class XiaoBeiService {
         LocalDateTime now = LocalDateTime.now();
 //        boolean isGroup = group.getGroupId() == botConfig.getGroupId() || group.getGroupId() == botConfig.getTaskId();
         boolean isGroup = isXbGroup(group, botConfig);
-        boolean isAtSelf = message.contains("" + bot.getBotId()) || message.contains(bot.getBotName());
+        boolean isAtSelf = isAtSelf(message,bot);
         if (isGroup && isAtSelf) {
             if (message.contains("参加过本次所有秘境")) {
                 proccessCultivation(group, botConfig);
@@ -329,7 +380,7 @@ public class XiaoBeiService {
         BotConfig botConfig = bot.getBotConfig();
 //        boolean isGroup = group.getGroupId() == botConfig.getGroupId() || group.getGroupId() == botConfig.getTaskId();
         boolean isGroup = isXbGroup(group, botConfig);
-        boolean isAtSelf = message.contains("" + bot.getBotId()) || message.contains(bot.getBotName());
+        boolean isAtSelf = isAtSelf(message,bot);
         if (isGroup && isAtSelf) {
             if (message.contains("在做悬赏令呢") && message.contains("分身乏术")) {
                 group.sendMessage((new MessageChain()).at("3889029313").text("悬赏令结算"));
@@ -378,7 +429,7 @@ public class XiaoBeiService {
         BotConfig botConfig = bot.getBotConfig();
 //        boolean isGroup = group.getGroupId() == botConfig.getGroupId() || group.getGroupId() == botConfig.getTaskId();
         boolean isGroup = isXbGroup(group, botConfig);
-        boolean isAtSelf = message.contains("" + bot.getBotId()) || message.contains(bot.getBotName());
+        boolean isAtSelf = isAtSelf(message,bot);
         if (isGroup && isAtSelf && message.contains("发布悬赏令如下")) {
             Iterator<TextMessage> textMessageIterator = messageChain.getMessageByType(TextMessage.class).iterator();
             group.sendMessage((new MessageChain()).at("3889029313").text("悬赏令接取"+selectBestTask(message)));
@@ -402,8 +453,9 @@ public class XiaoBeiService {
 
         // 优先级物品列表（从上到下优先级递减）
         String[] priorityItems = {
-                "佛怒火莲", "天剑破虚", "仙火焚天", "千慄鬼噬", "明心问道果",
-                "离火梧桐芝", "剑魄竹笋", "尘磊岩麟果","风神诀", "合欢魔功",
+                "佛怒火莲", "天剑破虚", "仙火焚天", "千慄鬼噬","灭剑","万剑","宿命通", "明心问道果",
+                "离火梧桐芝", "剑魄竹笋", "尘磊岩麟果","风神诀", "合欢魔功"
+
         };
 
         // 1. 检查是否有优先物品
@@ -500,7 +552,7 @@ public class XiaoBeiService {
         long groupId = botConfig.getGroupId();
 //        boolean isGroup = group.getGroupId() == botConfig.getGroupId() || group.getGroupId() == botConfig.getTaskId();
         boolean isGroup = isXbGroup(group, botConfig);
-        boolean isAtSelf = message.contains("" + bot.getBotId()) || message.contains(bot.getBotName());
+        boolean isAtSelf = isAtSelf(message,bot);
         if (isGroup && isAtSelf && message.contains("悬赏令结算") && message.contains("增加修为")) {
             bot.getBotConfig().setXslTime(-1L);
             group.sendMessage((new MessageChain()).at("3889029313").text("悬赏令刷新"));
@@ -575,7 +627,7 @@ public class XiaoBeiService {
     public void 灵田领取结果(Bot bot, Group group, Member member, MessageChain messageChain, String message, Integer messageId) throws InterruptedException {
         BotConfig botConfig = bot.getBotConfig();
         boolean isGroup = isXbGroup(group,botConfig);
-        boolean isAtSelf = message.contains("" + bot.getBotId()) || message.contains(bot.getBotName());
+        boolean isAtSelf = isAtSelf(message,bot);
         if (isGroup && isAtSelf) {
             if (message.contains("灵田还不能收取")) {
                 String[] parts = message.split("：|小时");

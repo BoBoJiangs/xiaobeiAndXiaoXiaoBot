@@ -25,6 +25,7 @@ bot:
     enableXslPriceQuery: false
     # 修炼模式：0什么都不干，1修炼，2普通闭关，3宗门闭关
     cultivationMode: 3
+    #自动灵田
     enableAutoField: false
   #    这个连接方式可能更稳定
   - type: ws-reverse
